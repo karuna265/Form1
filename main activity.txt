@@ -1,0 +1,665 @@
+Main Activity 
+package com.example.myapplication;
+
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.Patterns;
+import android.view.View;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.bumptech.glide.Glide;
+
+import java.util.Calendar;
+
+public class MainActivity extends AppCompatActivity {
+
+    private EditText etName, etEmail, etMobile;
+    private CheckBox cbCricket, cbTravelling, cbExploring;
+    private RadioGroup rgGender;
+    private TextView tvDate, tvTime;
+    private Switch switchMarital;
+    private Button btnSubmit;
+    ImageView ivProfile;
+    private int PICK_IMAGE_REQUEST = 100;
+    private Uri uri;
+
+    // FIX 1a: Use the correct uppercase type name for your class file
+    dbhelper dbHelper;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        // Initialize Views
+        etName = findViewById(R.id.etName);
+        etEmail = findViewById(R.id.etEmail);
+        etMobile = findViewById(R.id.etMobile);
+        cbCricket = findViewById(R.id.cbCricket);
+        cbTravelling = findViewById(R.id.cbTravelling);
+        cbExploring = findViewById(R.id.cbExploring);
+        rgGender = findViewById(R.id.rgGender);
+        tvDate = findViewById(R.id.tvDate);
+        tvTime = findViewById(R.id.tvTime);
+        switchMarital = findViewById(R.id.switch1);
+        btnSubmit = findViewById(R.id.btnSubmit);
+        ivProfile = findViewById(R.id.ivProfile);
+
+        // FIX 1b: Initialize the database companion instance here!
+        dbHelper = new dbhelper(this);
+
+        // Date Picker Listener
+        tvDate.setOnClickListener(v -> {
+            Calendar c = Calendar.getInstance();
+            int year = c.get(Calendar.YEAR);
+            int month = c.get(Calendar.MONTH);
+            int day = c.get(Calendar.DAY_OF_MONTH);
+
+            DatePickerDialog datePickerDialog = new DatePickerDialog(MainActivity.this,
+                    (view, year1, monthOfYear, dayOfMonth) -> tvDate.setText(dayOfMonth + "/" + (monthOfYear + 1) + "/" + year1),
+                    year, month, day);
+            datePickerDialog.show();
+        });
+
+        // Time Picker Listener
+        tvTime.setOnClickListener(v -> {
+            Calendar c = Calendar.getInstance();
+            int hour = c.get(Calendar.HOUR_OF_DAY);
+            int minute = c.get(Calendar.MINUTE);
+
+            TimePickerDialog timePickerDialog = new TimePickerDialog(MainActivity.this,
+                    (view, hourOfDay, minute1) ->
+                            tvTime.setText(String.format("%02d:%02d", hourOfDay, minute1)),
+                    hour, minute, true);
+            timePickerDialog.show();
+        });
+
+        // Submit Button Click
+        btnSubmit.setOnClickListener(v -> {
+            if (validateInputs()) {
+                sendDataToNextActivity();
+            }
+        });
+
+        // FIX 3: Trigger image picker function when clicking user image holder
+        ivProfile.setOnClickListener(v -> openImageChooser());
+    }
+
+    private boolean validateInputs() {
+        // 1. Name Validation
+        String name = etName.getText().toString().trim();
+        if (TextUtils.isEmpty(name)) {
+            etName.setError("Name is required");
+            etName.requestFocus();
+            return false;
+        }
+
+        // 2. Email Validation
+        String email = etEmail.getText().toString().trim();
+        if (TextUtils.isEmpty(email)) {
+            etEmail.setError("Email is required");
+            etEmail.requestFocus();
+            return false;
+        } else if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            etEmail.setError("Please enter a valid email address");
+            etEmail.requestFocus();
+            return false;
+        }
+
+        // 3. Mobile Validation
+        String mobile = etMobile.getText().toString().trim();
+        if (TextUtils.isEmpty(mobile)) {
+            etMobile.setError("Mobile number is required");
+            etMobile.requestFocus();
+            return false;
+        } else if (mobile.length() < 10) {
+            etMobile.setError("Enter a valid 10-digit mobile number");
+            etMobile.requestFocus();
+            return false;
+        }
+
+        // 4. Hobbies Validation (At least one must be checked)
+        if (!cbCricket.isChecked() && !cbTravelling.isChecked() && !cbExploring.isChecked()) {
+            Toast.makeText(this, "Please select at least one hobby", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        // 5. Gender Validation
+        if (rgGender.getCheckedRadioButtonId() == -1) {
+            Toast.makeText(this, "Please select your gender", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        // 6. Date Validation
+        String date = tvDate.getText().toString();
+        if (date.equals("Select Date")) {
+            Toast.makeText(this, "Please select a date", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        // 7. Time Validation
+        String time = tvTime.getText().toString();
+        if (time.equals("Select Time")) {
+            Toast.makeText(this, "Please select a time", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        return true;
+    }
+
+    private void openImageChooser() {
+        Intent intent = new Intent();
+        intent.setType("image/*");
+        intent.setAction(Intent.ACTION_GET_CONTENT);
+        startActivityForResult(Intent.createChooser(intent, "Select Profile Picture"), PICK_IMAGE_REQUEST);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == PICK_IMAGE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            uri = data.getData();
+
+            Glide.with(MainActivity.this)
+                    .load(uri)
+                    .centerCrop()
+                    .into(ivProfile);
+        }
+    }
+
+    private void sendDataToNextActivity() {
+        String imgStr = (uri != null) ? uri.toString() : "";
+        String nameStr = etName.getText().toString().trim();
+        String emailStr = etEmail.getText().toString().trim();
+        String mobileStr = etMobile.getText().toString().trim();
+
+        StringBuilder hobbiesBuilder = new StringBuilder();
+        if (cbCricket.isChecked()) hobbiesBuilder.append("Cricket ");
+        if (cbTravelling.isChecked()) hobbiesBuilder.append("Travelling ");
+        if (cbExploring.isChecked()) hobbiesBuilder.append("Exploring ");
+        String hobbiesStr = hobbiesBuilder.toString().trim().replace(" ", ", ");
+
+        int selectedGenderId = rgGender.getCheckedRadioButtonId();
+        RadioButton rbSelectedGender = findViewById(selectedGenderId);
+        String genderStr = rbSelectedGender.getText().toString();
+
+        String dateStr = tvDate.getText().toString();
+        String timeStr = tvTime.getText().toString();
+        String maritalStr = switchMarital.isChecked() ? "Married" : "Single";
+
+        // Insert records into native SQLite
+        dbhelper db = new dbhelper(MainActivity.this);
+
+        boolean isInserted = dbHelper.insertUserData(imgStr, nameStr, emailStr, mobileStr,
+                hobbiesStr, genderStr, dateStr, timeStr, maritalStr);
+
+        if (isInserted) {
+            Toast.makeText(MainActivity.this, "Data Saved to SQLite!", Toast.LENGTH_SHORT).show();
+
+            // FIX 2: Consolidate onto a single explicit variable reference ('displayIntent')
+            Intent displayIntent = new Intent(MainActivity.this, DisplayActivity.class);
+            displayIntent.putExtra("KEY_IMAGE_URI", imgStr);
+            displayIntent.putExtra("KEY_NAME", nameStr);
+            displayIntent.putExtra("KEY_EMAIL", emailStr);
+            displayIntent.putExtra("KEY_MOBILE", mobileStr);
+            displayIntent.putExtra("KEY_HOBBIES", hobbiesStr);
+            displayIntent.putExtra("KEY_GENDER", genderStr);
+            displayIntent.putExtra("KEY_DATE", dateStr);
+            displayIntent.putExtra("KEY_TIME", timeStr);
+            displayIntent.putExtra("KEY_MARITAL", maritalStr);
+
+            startActivity(displayIntent);
+        } else {
+            Toast.makeText(MainActivity.this, "Database Insertion Failed", Toast.LENGTH_SHORT).show();
+        }
+    }
+}
+
+
+Display Activity 
+
+package com.example.myapplication;
+
+import android.net.Uri;
+import android.os.Bundle;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.Switch;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.bumptech.glide.Glide;
+
+public class DisplayActivity extends AppCompatActivity {
+
+            private EditText etName, etEmail, etMobile;
+            private CheckBox cbCricket, cbTravelling, cbExploring;
+            private RadioGroup rgGender;
+            private RadioButton rbMale, rbFemale;
+            private TextView tvDate, tvTime;
+            private Switch switchMarital;
+
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                setContentView(R.layout.activity_display2); // Use the XML file you provided
+
+                // 1. Initialize all Views from your XML
+                etName = findViewById(R.id.etName);
+                etEmail = findViewById(R.id.etEmail);
+                etMobile = findViewById(R.id.etMobile);
+                cbCricket = findViewById(R.id.cbCricket);
+                cbTravelling = findViewById(R.id.cbTravelling);
+                cbExploring = findViewById(R.id.cbExploring);
+                rgGender = findViewById(R.id.rgGender);
+                rbMale = findViewById(R.id.rbMale);
+                rbFemale = findViewById(R.id.rbFemale);
+                tvDate = findViewById(R.id.tvDate);
+                tvTime = findViewById(R.id.tvTime);
+                switchMarital = findViewById(R.id.switch1);
+
+                // 2. Disable editing so it behaves like a "Display" screen
+                disableInputs();
+
+                // 3. Receive data from Intent
+                Bundle extras = getIntent().getExtras();
+                if (extras != null) {
+                    // Set Text Fields
+                    etName.setText(extras.getString("KEY_NAME"));
+                    etEmail.setText(extras.getString("KEY_EMAIL"));
+                    etMobile.setText(extras.getString("KEY_MOBILE"));
+                    tvDate.setText(extras.getString("KEY_DATE"));
+                    tvTime.setText(extras.getString("KEY_TIME"));
+
+                    // Set Gender RadioButtons
+                    String gender = extras.getString("KEY_GENDER");
+                    if ("Male".equalsIgnoreCase(gender)) {
+                        rbMale.setChecked(true);
+                    } else if ("Female".equalsIgnoreCase(gender)) {
+                        rbFemale.setChecked(true);
+                    }
+
+                    // Set Marital Status Switch
+                    String marital = extras.getString("KEY_MARITAL");
+                    switchMarital.setChecked("Married".equalsIgnoreCase(marital));
+
+                    // Set Hobbies Checkboxes
+                    String hobbies = extras.getString("KEY_HOBBIES");
+                    if (hobbies != null) {
+                        if (hobbies.contains("Cricket")) cbCricket.setChecked(true);
+                        if (hobbies.contains("Travelling")) cbTravelling.setChecked(true);
+                        if (hobbies.contains("Exploring")) cbExploring.setChecked(true);
+                    }
+                    // Extract inside DisplayActivity.java display logic loop
+                    String imageUriString = getIntent().getStringExtra("KEY_IMAGE_URI");
+                    ImageView ivProfileDisplay = findViewById(R.id.ivProfile); // Match layout ID
+
+                    if (imageUriString != null) {
+                        Uri imageUri = Uri.parse(imageUriString);
+
+                        // Load inside your second view using Glide
+                        Glide.with(this)
+                                .load(imageUri)
+                                .centerCrop()
+                                .into(ivProfileDisplay);
+                    }
+                }
+            }
+
+            private void disableInputs() {
+                // Prevents the user from typing or changing values in the display screen
+                etName.setFocusable(false);
+                etEmail.setFocusable(false);
+                etMobile.setFocusable(false);
+
+                cbCricket.setClickable(false);
+                cbTravelling.setClickable(false);
+                cbExploring.setClickable(false);
+
+                rbMale.setClickable(false);
+                rbFemale.setClickable(false);
+
+                switchMarital.setClickable(false);
+                tvDate.setClickable(false);
+                tvTime.setClickable(false);
+            }
+        }
+
+
+Dbhelper class 
+
+package com.example.myapplication;
+
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+import android.widget.Toast;
+
+public class dbhelper extends SQLiteOpenHelper {
+
+    // Database configurations
+    private static final String DATABASE_NAME = "UserDatabase.db";
+    private static final int DATABASE_VERSION = 1;
+
+    // Table and column layout constants
+    public static final String TABLE_NAME = "user_table";
+    public static final String COL_ID = "ID";
+    public static final String COL_IMAGE = "IMAGE_URI";
+    public static final String COL_NAME = "NAME";
+    public static final String COL_EMAIL = "EMAIL";
+    public static final String COL_MOBILE = "MOBILE";
+    public static final String COL_HOBBIES = "HOBBIES";
+    public static final String COL_GENDER = "GENDER";
+    public static final String COL_DATE = "DATE";
+    public static final String COL_TIME = "TIME";
+    public static final String COL_MARITAL = "MARITAL_STATUS";
+    private final Context context;
+
+    public dbhelper(Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        this.context = context;
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        // Raw SQL string to assemble the data columns
+        String createTable = "CREATE TABLE " + TABLE_NAME + " (" +
+                COL_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COL_IMAGE + " TEXT, " +
+                COL_NAME + " TEXT, " +
+                COL_EMAIL + " TEXT, " +
+                COL_MOBILE + " TEXT, " +
+                COL_HOBBIES + " TEXT, " +
+                COL_GENDER + " TEXT, " +
+                COL_DATE + " TEXT, " +
+                COL_TIME + " TEXT, " +
+                COL_MARITAL + " TEXT)";
+        db.execSQL(createTable);
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_NAME);
+        onCreate(db);
+    }
+
+    public boolean insertUserData(String image, String name, String email, String mobile,
+                                  String hobbies, String gender, String date, String time, String marital) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues contentValues = new ContentValues();
+
+        contentValues.put(COL_IMAGE, image);
+        contentValues.put(COL_NAME, name);
+        contentValues.put(COL_EMAIL, email);
+        contentValues.put(COL_MOBILE, mobile);
+        contentValues.put(COL_HOBBIES, hobbies);
+        contentValues.put(COL_GENDER, gender);
+        contentValues.put(COL_DATE, date);
+        contentValues.put(COL_TIME, time);
+        contentValues.put(COL_MARITAL, marital);
+
+        long result = db.insert(TABLE_NAME, null, contentValues);
+        if(result == -1){
+            Toast.makeText(context, "failed", Toast.LENGTH_SHORT).show();
+            return false ;
+        }else{
+            Toast.makeText(context, "Succesfully added", Toast.LENGTH_SHORT).show();
+            return true ;
+        }
+    }
+    // Reads all user details from SQLite database
+    public Cursor getAllUsers() {
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        return db.rawQuery("SELECT * FROM " + TABLE_NAME, null);
+    }
+}
+
+
+UserAdaptor
+
+package com.example.myapplication;
+
+import android.content.Context;
+import android.net.Uri;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.bumptech.glide.Glide;
+
+import java.util.ArrayList;
+
+public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder> {
+
+    private Context context;
+    private ArrayList<UserModel> userList;
+
+    // Constructor to pass context and database list array from your Activity
+    public UserAdapter(Context context, ArrayList<UserModel> userList) {
+        this.context = context;
+        this.userList = userList;
+    }
+
+    @NonNull
+    @Override
+    public UserViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        // Inflate your single row xml layout design here
+        View view = LayoutInflater.from(context).inflate(R.layout.userview, parent, false);
+        return new UserViewHolder(view);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull UserViewHolder holder, int position) {
+        // Get the specific user item for the current list row position
+        UserModel user = userList.get(position);
+
+        // Assign textual data
+        holder.tvName.setText(user.getName());
+        holder.tvEmail.setText(user.getEmail());
+
+        // Combine minor details nicely in a clean descriptive layout line
+        String detailLine = user.getGender() + " | " + user.getMobile() + " | " + user.getMaritalStatus();
+        holder.tvDetails.setText(detailLine);
+
+        // Load the image path safely via Glide strings to avoid permission crashes
+        if (user.getImageUri() != null && !user.getImageUri().isEmpty()) {
+            Glide.with(context)
+                    .load(Uri.parse(user.getImageUri()))
+                    .placeholder(android.R.drawable.ic_menu_camera) // Default icon while loading
+                    .centerCrop()
+                    .into(holder.ivProfile);
+        } else {
+            // Default image fallback if the user didn't pick an image
+            holder.ivProfile.setImageResource(android.R.drawable.ic_menu_camera);
+        }
+    }
+
+    @Override
+    public int getItemCount() {
+        return userList.size(); // Tells RecyclerView how many rows to render total
+    }
+
+    // ViewHolder inner class caches your row layout item view IDs
+    public static class UserViewHolder extends RecyclerView.ViewHolder {
+        ImageView ivProfile;
+        TextView tvName, tvEmail, tvDetails;
+
+        public UserViewHolder(@NonNull View itemView) {
+            super(itemView);
+            ivProfile = itemView.findViewById(R.id.ivProfile);
+            tvName = itemView.findViewById(R.id.tvRowName);
+            tvEmail = itemView.findViewById(R.id.tvRowEmail);
+            tvDetails = itemView.findViewById(R.id.tvRowDetails);
+        }
+    }
+}
+
+user model
+
+package com.example.myapplication;
+
+public class UserModel {
+    private int id;
+    private String imageUri;
+    private String name;
+    private String email;
+    private String mobile;
+    private String hobbies;
+    private String gender;
+    private String date;
+    private String time;
+    private String maritalStatus;
+
+    // Constructor: Used to easily create a user object with all database fields
+    public UserModel(int id, String imageUri, String name, String email, String mobile,
+                     String hobbies, String gender, String date, String time, String maritalStatus) {
+        this.id = id;
+        this.imageUri = imageUri;
+        this.name = name;
+        this.email = email;
+        this.mobile = mobile;
+        this.hobbies = hobbies;
+        this.gender = gender;
+        this.date = date;
+        this.time = time;
+        this.maritalStatus = maritalStatus;
+    }
+
+    // Getters: Your Adapter needs these to read the values and display them in the RecyclerView rows
+    public int getId() {
+        return id;
+    }
+
+    public String getImageUri() {
+        return imageUri;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public String getMobile() {
+        return mobile;
+    }
+
+    public String getHobbies() {
+        return hobbies;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public String getDate() {
+        return date;
+    }
+
+    public String getTime() {
+        return time;
+    }
+
+    public String getMaritalStatus() {
+        return maritalStatus;
+    }
+}
+
+ViewActity
+
+package com.example.myapplication;
+
+import android.database.Cursor;
+import android.os.Bundle;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import java.util.ArrayList;
+
+public class ViewActivity extends AppCompatActivity {
+
+    private RecyclerView rvUsers;
+    private UserAdapter adapter;
+    private ArrayList<UserModel> userList;
+    private dbhelper dbHelper;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_display2);
+
+        // Initialize UI components
+        rvUsers = findViewById(R.id.rvUsers);
+        rvUsers.setLayoutManager(new LinearLayoutManager(this));
+
+        userList = new ArrayList<>();
+        dbHelper = new dbhelper(this);
+
+        // Fetch user data from database helper
+        loadUserDataFromDatabase();
+    }
+
+    private void loadUserDataFromDatabase() {
+        Cursor cursor = dbHelper.getAllUsers();
+
+        if (cursor == null || cursor.getCount() == 0) {
+            Toast.makeText(this, "No records found in database!", Toast.LENGTH_SHORT).show();
+            if (cursor != null) cursor.close();
+            return;
+        }
+
+        // Read columns row-by-row
+        while (cursor.moveToNext()) {
+            int id = cursor.getInt(cursor.getColumnIndexOrThrow(dbhelper.COL_ID));
+            String image = cursor.getString(cursor.getColumnIndexOrThrow(dbhelper.COL_IMAGE));
+            String name = cursor.getString(cursor.getColumnIndexOrThrow(dbhelper.COL_NAME));
+            String email = cursor.getString(cursor.getColumnIndexOrThrow(dbhelper.COL_EMAIL));
+            String mobile = cursor.getString(cursor.getColumnIndexOrThrow(dbhelper.COL_MOBILE));
+            String hobbies = cursor.getString(cursor.getColumnIndexOrThrow(dbhelper.COL_HOBBIES));
+            String gender = cursor.getString(cursor.getColumnIndexOrThrow(dbhelper.COL_GENDER));
+            String date = cursor.getString(cursor.getColumnIndexOrThrow(dbhelper.COL_DATE));
+            String time = cursor.getString(cursor.getColumnIndexOrThrow(dbhelper.COL_TIME));
+            String marital = cursor.getString(cursor.getColumnIndexOrThrow(dbhelper.COL_MARITAL));
+
+            // Pack values securely inside individual model containers
+            UserModel user = new UserModel(id, image, name, email, mobile, hobbies, gender, date, time, marital);
+            userList.add(user);
+        }
+
+        cursor.close(); // Prevent memory tracking leaks
+
+        // Attach populated ArrayList to our UI view components
+        adapter = new UserAdapter(this, userList);
+        rvUsers.setAdapter(adapter);
+    }
+}
